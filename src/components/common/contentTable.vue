@@ -12,7 +12,12 @@
         <td v-else-if="checkItem"><input type="checkbox" v-model="checkArrays" :value="item"></td>
         <td v-if="showIndex">{{pageParams.pageSize*(pageParams.page-1)+index+1}}</td>
         <td v-for="one in titles" :title="one.strCut?item[one.value]:''">
-          <slot name="tdValue" :item="item" :one="one">{{showWords(item[one.value],one)}}</slot>
+          <template v-if="one.customTd">
+            <slot name="tdCustom" :item="item" :one="one" :index="index"></slot>
+          </template>
+          <template v-else>
+            {{showWords(item[one.value],one)}}
+          </template>
         </td>
         <td v-if="!noOperat">
           <slot name="tdOperate" :item="item"></slot>
@@ -27,165 +32,129 @@
         </td>
       </tr>
     </table>
-    <page v-if="totalPage>1 && !addPageNumber" :total-page="totalPage" v-on:goPage="nextPage" v-on:changePageSize="changePageSize"></page>
+    <page v-if="totalPage>1 && !addPageNumber" :total-page="totalPage" v-on:goPage="nextPage"
+          v-on:changePageSize="changePageSize"></page>
   </div>
 </template>
 
 <script lang="ts">
-  import {Component, Prop, Vue, Watch} from "vue-property-decorator";
-  import page from "./page.vue";
+  import {Component, Prop, Vue, Watch} from "vue-property-decorator"
+  import page from "./page.vue"
+  import {TableField, TableFields} from './compFieldDefine'
 
-  @Component({components:{page}})
-  export default class contentTable extends Vue{
-    @Prop() constants :any;
-    @Prop() titles :any;
-    @Prop() totalPage :any;
-    @Prop() pageParams :any;
-    @Prop() noOperat :any;
-    @Prop() checkKey :any;
-    @Prop() showIndex :any;
-    @Prop() operateWidth :any;
-    @Prop() checkItem :any;
-    @Prop() addPageNumber :any;
+  @Component({components: {page}})
+  export default class contentTable extends Vue {
+    @Prop() constants: any[]
+    @Prop() titles: TableFields
+    @Prop() totalPage: number
+    @Prop() pageParams: any
+    @Prop({default: false}) noOperat?: boolean
+    @Prop() checkKey?: string
+    @Prop({default: false}) showIndex?: boolean
+    @Prop() operateWidth?: string
+    @Prop({default: false}) checkItem?: boolean
+    @Prop() addPageNumber?: number
 
-    isCheckall:boolean=false;
-    pageCount:number=1;
-    checkArrays:any=[];
+    isCheckall: boolean = false
+    pageCount: number = 1
+    checkArrays: any = []
+
     @Watch('checkArrays')
-    checkArraysChange(val){
-      if(val.length === this.constants.length && this.constants.length!==0){
-        this.isCheckall = true;
+    checkArraysChange (val: any[]) {
+      if (val.length === this.constants.length && this.constants.length !== 0) {
+        this.isCheckall = true
+      } else {
+        this.isCheckall = false
       }
-      else{
-        this.isCheckall = false;
-      }
-      this.$emit('checkArrays',val)
+      this.$emit('checkArrays', val)
     }
+
     @Watch('constants')
-    constantsChange(val){
-      if(this.checkKey){
-        this.checkArrays=[];
+    constantsChange () {
+      if (this.checkKey) {
+        this.checkArrays = []
       }
     }
+
     @Watch('addPageNumber')
-    addPageNumberChange(val){
-      this.pageCount=val;
+    addPageNumberChange (val: number) {
+      this.pageCount = val
     }
+
     /**
      * @author wanghan
      * @date 2019/8/5
      * @Description: 表格内容转换展示
      */
-    showWords(value,one){
-      if(value===null || value===''){
-        return '-';
+    showWords (value: any, one: TableField): any {
+      if (value === null || value === '') {
+        return '-'
       }
-      let result='-';
-      if(one.func){                 //支持自定义函数转换，例{name:'事件类型',value:'eventType',func:this.test},methods:test(val){if(val==='001001'){return 'whtest';}else {return '-'}},
-        return one.func(value);
-      }else if(one.options){        //支持给定{label:'',value:''}对应转换，例{name:'事件类型',value:'eventType',options:[{label:'showWords',value:'001001'}]}
-        let obj=one.options.find(item=>{return item.value===value});
-        result=obj?obj.label:value
-      }else if(one.timeFormat){      //支持时间戳转换，例{name:'更新时间',value:'outime',timeFormat:'yyyy-MM-dd hh:mm:ss'},
-        result=new Date(value).format(one.timeFormat)
-      }else if(one.strCut){          //支持文字超出隐藏鼠标悬浮展示，例{name:'左边条件表达式',value:'leftExpression',strCut:80},
-        result=this.strCut(one.strCut,value)
-      }else {
-        result=value;
+      let result: string = '-'
+      if (one.func) {                 //支持自定义函数转换，例{name:'事件类型',value:'eventType',func:this.test},methods:test(val){if(val==='001001'){return 'whtest';}else {return '-'}},
+        return one.func(value)
+      } else if (one.options) {        //支持给定{label:'',value:''}对应转换，例{name:'事件类型',value:'eventType',options:[{label:'showWords',value:'001001'}]}
+        let obj = one.options.find((item: any) => {
+          return item.value === value
+        })
+        result = obj ? obj.label : value
+      } else if (one.timeFormat) {      //支持时间戳转换，例{name:'更新时间',value:'outime',timeFormat:'yyyy-MM-dd hh:mm:ss'},
+        result = new Date(value).format(one.timeFormat)
+      } else if (one.strCut) {          //支持文字超出隐藏鼠标悬浮展示，例{name:'左边条件表达式',value:'leftExpression',strCut:80},
+        result = this.strCut(one.strCut, value) || '-'
+      } else {
+        result = value
       }
-      return result;
+      return result
     }
-    nextPage(jumpPage){
-      this.$emit('goPage',jumpPage);
+
+    nextPage (jumpPage: any) {
+      this.$emit('goPage', jumpPage)
     }
-    changePageSize(pageSize){
-      this.$emit('changePageSize',pageSize);
+
+    changePageSize (pageSize: number) {
+      this.$emit('changePageSize', pageSize)
     }
-    more(){
-      this.pageCount++;
-      this.$emit('addPage',this.pageCount);
+
+    more () {
+      this.pageCount++
+      this.$emit('addPage', this.pageCount)
     }
-    checkAll(){
-      this.checkArrays.length = 0;
-      if(this.isCheckall){
-        this.constants.forEach((item,index) =>{
-          if(this.checkItem){
-            this.checkArrays.push(item);
-          }else if(this.checkKey){
-            this.checkArrays.push(item[this.checkKey]);
+
+    checkAll () {
+      this.checkArrays.length = 0
+      if (this.isCheckall) {
+        this.constants.forEach((item: any, index: number) => {
+          if (this.checkItem) {
+            this.checkArrays.push(item)
+          } else if (this.checkKey) {
+            this.checkArrays.push(item[this.checkKey])
           }
         })
       }
     }
+
     //文字超出隐藏
-    strCut(num, str){
-      if(!num || !str) return '-';
-      if(!!str){
+    strCut (num: number, str: string): string {
+      if (!num || !str) {
+        return '-'
+      } else {
         if (str.split("").length < num) {
-          return str.slice(0, num);
-        } else return str.slice(0, num) + '...';
+          return str.slice(0, num)
+        } else {
+          return str.slice(0, num) + '...'
+        }
       }
     }
   }
-/*  export default {
-    components: {
-      page
-    },
-    props:[
-      'constants',//表格内容数组
-      'titles',//表头数组
-      'totalPage',//总页码
-      'pageParams',//分页参数{page:1,pageSize:10}，若showIndex为true,则pageParams必传
-      'noOperat',//是否显示操作项
-      'checkKey',//显示多选框，并且按照checkKey的字段的值保存到数组，如checkKey为oid,则选中的值为一个oid数组
-      'showIndex',//是否显示序号，true为显示
-      'operateWidth',//操作项固定宽度
-      'checkItem',//显示多选框，并且选中的值保存为整条数据
-      'addPageNumber'//是否显示更多
-    ],
-    data () {
-      return {
-        isCheckall:false,
-        checkArrays:[],
-        pageCount:1
-
-      }
-    },
-    watch: {
-      checkArrays(val){
-        if(val.length === this.constants.length && this.constants.length!==0){
-          this.isCheckall = true;
-        }
-        else{
-          this.isCheckall = false;
-        }
-        this.$emit('checkArrays',val)
-      },
-      constants(val){
-        if(this.checkKey){
-          this.checkArrays=[];
-        }
-      },
-      addPageNumber:{
-        handler:function (val) {
-          this.pageCount=val;
-        }
-      }
-    },
-    mounted () {
-
-    },
-    methods: {
-
-    }
-  }*/
 </script>
 <style scoped>
-  .table_wrap{
+  .table_wrap {
     background: #fff;
     margin-top: 20px;
   }
-  table tr td{
+
+  table tr td {
     word-break: break-all;
   }
 </style>
